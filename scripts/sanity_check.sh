@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "== Proximal Energy Sanity Check =="
+echo "== Agentic RAG Sanity Check =="
 
 rm -rf artifacts
 mkdir -p artifacts
@@ -16,8 +16,10 @@ if [[ ! -f "$OUT" ]]; then
   exit 1
 fi
 
-python3 scripts/verify_output.py "$OUT"
+if command -v python3 >/dev/null 2>&1; then
+  python3 scripts/verify_output.py "$OUT"
+else
+  python scripts/verify_output.py "$OUT"
+fi
 
 echo "OK: sanity check passed"
-
-After updating, run: chmod +x scripts/sanity_check.sh

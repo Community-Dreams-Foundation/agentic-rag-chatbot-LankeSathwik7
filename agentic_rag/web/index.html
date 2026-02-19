@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Agentic RAG Arena</title>
+  <style>
+    :root {
+      --bg-a: #0e1b2a;
+      --bg-b: #12344a;
+      --card: rgba(250, 250, 245, 0.95);
+      --ink: #10222e;
+      --accent: #f08a24;
+      --accent-2: #0c8d7e;
+      --warn: #a33131;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Avenir Next", "Gill Sans MT", "Trebuchet MS", sans-serif;
+      color: #f5f4ef;
+      background:
+        radial-gradient(circle at 12% 18%, rgba(240, 138, 36, 0.25), transparent 38%),
+        radial-gradient(circle at 84% 12%, rgba(12, 141, 126, 0.3), transparent 42%),
+        linear-gradient(120deg, var(--bg-a), var(--bg-b));
+      min-height: 100vh;
+    }
+    .wrap {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 24px 16px 40px;
+      animation: rise 420ms ease-out;
+    }
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    h1 {
+      margin: 0 0 10px;
+      font-size: clamp(1.6rem, 3vw, 2.1rem);
+      letter-spacing: 0.02em;
+    }
+    .sub {
+      opacity: 0.9;
+      margin-bottom: 16px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+    .card {
+      background: var(--card);
+      color: var(--ink);
+      border-radius: 14px;
+      padding: 14px;
+      box-shadow: 0 10px 26px rgba(0, 0, 0, 0.18);
+    }
+    label {
+      display: block;
+      font-weight: 700;
+      margin: 0 0 6px;
+    }
+    textarea, input, select, button {
+      width: 100%;
+      border-radius: 9px;
+      border: 1px solid rgba(16, 34, 46, 0.25);
+      padding: 10px;
+      font: inherit;
+      margin-bottom: 10px;
+    }
+    button {
+      cursor: pointer;
+      font-weight: 700;
+      color: #fff;
+      background: linear-gradient(100deg, var(--accent), #f36f31);
+      border: 0;
+      transition: transform .12s ease;
+    }
+    button.secondary {
+      background: linear-gradient(100deg, var(--accent-2), #1777a5);
+    }
+    button:hover { transform: translateY(-1px); }
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    pre {
+      white-space: pre-wrap;
+      word-break: break-word;
+      background: #0f202b;
+      color: #e9f6ff;
+      border-radius: 10px;
+      padding: 10px;
+      min-height: 90px;
+      margin: 0;
+    }
+    .warn { color: var(--warn); font-weight: 700; }
+    @media (max-width: 880px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Agentic RAG Arena</h1>
+    <div class="sub">Upload docs, ask grounded questions with citations, and keep session memory/history.</div>
+
+    <div class="card">
+      <label for="session">Session ID</label>
+      <div class="row">
+        <input id="session" value="session-1" />
+        <button class="secondary" id="refreshSessions">Refresh Sessions</button>
+      </div>
+      <select id="sessionsList"></select>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <label for="files">Upload Text/Markdown Files</label>
+        <input id="files" type="file" multiple />
+        <button id="uploadBtn">Upload + Index</button>
+        <pre id="uploadOut"></pre>
+      </div>
+
+      <div class="card">
+        <label for="question">Ask Question</label>
+        <textarea id="question" rows="4" placeholder="What are the key assumptions?"></textarea>
+        <button id="askBtn">Ask</button>
+        <pre id="answerOut"></pre>
+      </div>
+
+      <div class="card">
+        <label for="memory">Add Memory Signal</label>
+        <textarea id="memory" rows="3" placeholder="I prefer weekly summaries on Mondays."></textarea>
+        <button id="memoryBtn">Write Selective Memory</button>
+        <pre id="memoryOut"></pre>
+      </div>
+
+      <div class="card">
+        <label>Session History</label>
+        <button class="secondary" id="historyBtn">Load History</button>
+        <pre id="historyOut"></pre>
+      </div>
+    </div>
+    <p class="warn" id="error"></p>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const out = (id, payload) => $(id).textContent = typeof payload === "string" ? payload : JSON.stringify(payload, null, 2);
+    const setErr = (msg) => $("error").textContent = msg || "";
+
+    async function api(path, method = "GET", body = null) {
+      const opts = { method, headers: { "Content-Type": "application/json" } };
+      if (body) opts.body = JSON.stringify(body);
+      const res = await fetch(path, opts);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      return data;
+    }
+
+    async function refreshSessions() {
+      setErr("");
+      const data = await api("/api/sessions");
+      const sel = $("sessionsList");
+      sel.innerHTML = "";
+      for (const s of data.sessions) {
+        const o = document.createElement("option");
+        o.value = s;
+        o.textContent = s;
+        sel.appendChild(o);
+      }
+    }
+
+    $("refreshSessions").onclick = async () => {
+      try { await refreshSessions(); } catch (e) { setErr(e.message); }
+    };
+
+    $("sessionsList").onchange = () => { $("session").value = $("sessionsList").value || "session-1"; };
+
+    $("uploadBtn").onclick = async () => {
+      try {
+        setErr("");
+        const input = $("files");
+        if (!input.files.length) throw new Error("Select at least one file.");
+        const files = [];
+        for (const f of input.files) {
+          const content = await f.text();
+          files.push({ name: f.name, content });
+        }
+        const data = await api("/api/upload", "POST", { files });
+        out("uploadOut", data);
+      } catch (e) {
+        setErr(e.message);
+      }
+    };
+
+    $("askBtn").onclick = async () => {
+      try {
+        setErr("");
+        const session_id = $("session").value.trim() || "default";
+        const question = $("question").value.trim();
+        const data = await api("/api/ask", "POST", { session_id, question });
+        out("answerOut", data);
+      } catch (e) {
+        setErr(e.message);
+      }
+    };
+
+    $("memoryBtn").onclick = async () => {
+      try {
+        setErr("");
+        const session_id = $("session").value.trim() || "default";
+        const text = $("memory").value.trim();
+        const data = await api("/api/memory", "POST", { session_id, text });
+        out("memoryOut", data);
+      } catch (e) {
+        setErr(e.message);
+      }
+    };
+
+    $("historyBtn").onclick = async () => {
+      try {
+        setErr("");
+        const session_id = $("session").value.trim() || "default";
+        const data = await api(`/api/history?session_id=${encodeURIComponent(session_id)}`);
+        out("historyOut", data);
+      } catch (e) {
+        setErr(e.message);
+      }
+    };
+
+    refreshSessions().catch(() => {});
+  </script>
+</body>
+</html>
+

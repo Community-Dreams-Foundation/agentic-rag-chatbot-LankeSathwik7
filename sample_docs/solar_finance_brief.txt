@@ -1,0 +1,16 @@
+# Solar Storage Pilot Brief
+
+## Main Contribution
+The pilot introduced a weekly forecasting loop that combines weather-normalized demand estimates with battery dispatch constraints.
+This reduced planning variance by 18 percent compared with the previous quarter.
+The team also built a shared dashboard so Finance and Operations used the same assumptions during approval.
+
+## Assumptions
+The model assumes stable panel efficiency during each monthly planning cycle.
+It also assumes battery degradation remains below 2.5 percent per quarter.
+Weather shocks beyond the historical p95 range are treated as exceptions and escalated manually.
+
+## Limitations
+The pilot was tested in only two regions, so transferability to high-humidity zones is uncertain.
+Manual data handoff from Operations to Finance still introduces delay on Mondays.
+
